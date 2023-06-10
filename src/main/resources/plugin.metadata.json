@@ -1,0 +1,5 @@
+{
+  "id": "example-plugin",
+  "version": "0.0.1",
+  "main": "net.zhuruoling.omms.mcsm.MCSMSupport"
+}
