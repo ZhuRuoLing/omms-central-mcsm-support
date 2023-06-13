@@ -9,7 +9,7 @@ public class MCSMSupport extends PluginMain {
     public void onInitialize() {
         Config.INSTANCE.readConfig();
         ControllerLoadCallback.INSTANCE.register(controllerManager ->
-                Config.INSTANCE.getMcsmDaemons().forEach(daemon ->
+                Config.INSTANCE.getMcsmDaemons().forEach(daemon ->{}
                         //controllerManager.addController(new MCSMDaemonController(daemon))
                 )
         );
