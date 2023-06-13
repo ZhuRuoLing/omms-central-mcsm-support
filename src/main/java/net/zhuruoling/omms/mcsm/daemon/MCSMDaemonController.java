@@ -10,8 +10,10 @@ import net.zhuruoling.omms.central.controller.crashreport.CrashReportStorage;
 import java.util.List;
 
 public class MCSMDaemonController extends Controller {
-    public MCSMDaemonController(MCSMDaemon daemon){
 
+    final String name;
+    public MCSMDaemonController(MCSManagerDaemonInstance daemon){
+        this.name = daemon.getName();
     }
 
     @Override
@@ -46,6 +48,6 @@ public class MCSMDaemonController extends Controller {
 
     @Override
     public String getType() {
-        return null;
+        return "mcsmanager_instance";
     }
 }
