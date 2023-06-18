@@ -1,5 +1,6 @@
 package net.zhuruoling.omms.mcsm.daemon;
 
+@SuppressWarnings("all")
 public class MCSMDaemon {
     private String accessToken;
     private String address;

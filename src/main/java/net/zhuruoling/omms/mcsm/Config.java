@@ -3,13 +3,17 @@ package net.zhuruoling.omms.mcsm;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.zhuruoling.omms.central.util.Util;
+import net.zhuruoling.omms.mcsm.daemon.DaemonConnector;
 import net.zhuruoling.omms.mcsm.daemon.MCSMDaemon;
 import net.zhuruoling.omms.mcsm.exception.PluginInitializationException;
 
 import java.io.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 @SuppressWarnings("all")
 public class Config {
@@ -19,15 +23,19 @@ public class Config {
     public final static Path CONFIG_DIR = Path.of(Util.joinFilePaths("config"));
     private final static Gson gson = new GsonBuilder().serializeNulls().create();
 
-    private List<MCSMDaemon> mcsmDaemons;
+    private List<MCSMDaemon> mcsmDaemons = new ArrayList<>();
+
+    public final Map<MCSMDaemon, DaemonConnector> daemonConnectorMap = new HashMap<>();
 
     private Config() {
     }
 
 
-    public void readConfig() {
+    public boolean readConfig() {
+        boolean init = false;
         mcsmDaemons.clear();
         if (!CONFIG_DIR.toFile().exists()) {
+            init = true;
             try {
                 CONFIG_DIR.toFile().mkdir();
             } catch (SecurityException e) {
@@ -35,6 +43,7 @@ public class Config {
             }
         }
         if (!CONFIG_PATH.toFile().exists()) {
+            init = true;
             try {
                 CONFIG_PATH.toFile().createNewFile();
                 var file = CONFIG_PATH.toFile();
@@ -46,14 +55,27 @@ public class Config {
                 throw new PluginInitializationException("Cannot create plugin config.", e);
             }
         }
-        try (var reader = new BufferedReader(new FileReader(CONFIG_PATH.toFile()));){
-           mcsmDaemons.addAll(gson.fromJson(reader, mcsmDaemons.getClass()));
+        try (var reader = new BufferedReader(new FileReader(CONFIG_PATH.toFile()));) {
+            var list = gson.fromJson(reader, MCSMDaemon[].class);
+            for (MCSMDaemon daemon : list) {
+                mcsmDaemons.add(daemon);
+            }
         } catch (IOException e) {
             throw new PluginInitializationException("Cannot read plugin config.", e);
         }
+        return init;
     }
 
     public List<MCSMDaemon> getMcsmDaemons() {
         return mcsmDaemons;
     }
+
+    public Map<MCSMDaemon, DaemonConnector> getDaemonConnectorMap() {
+        return daemonConnectorMap;
+    }
+
+    public void run(Consumer<Map<MCSMDaemon, DaemonConnector>> func) {
+        func.accept(daemonConnectorMap);
+    }
+
 }

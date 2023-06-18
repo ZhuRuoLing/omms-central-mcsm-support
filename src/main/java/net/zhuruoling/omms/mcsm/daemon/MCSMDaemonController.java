@@ -11,39 +11,44 @@ import java.util.List;
 
 public class MCSMDaemonController extends Controller {
 
-    final String name;
-    public MCSMDaemonController(MCSManagerDaemonInstance daemon){
-        this.name = daemon.getName();
+    private final String name;
+    private final String instanceName;
+    private final MCSMDaemonInstance instance;
+
+    public MCSMDaemonController(MCSMDaemonInstance daemon) {
+        this.name = daemon.getDisplayName();
+        instanceName = daemon.getInstanceData().getConfig().getNickname();
+        this.instance = daemon;
     }
 
     @Override
     public boolean isStatusQueryable() {
-        return false;
+        return true;
     }
 
     @Override
     public List<String> sendCommand(String s) {
-        return null;
+        return List.of();
     }
 
     @Override
-    public ControllerConsole startControllerConsole(InputSource inputSource, PrintTarget<?, ControllerConsole> printTarget, String s) {
-        return null;
+    public ControllerConsole startControllerConsole(InputSource inputSource, PrintTarget<?, ControllerConsole> printTarget, String consoleId) {
+        return new MCSMDaemonControllerConsole(this, consoleId, inputSource, printTarget);
     }
 
     @Override
     public Status queryControllerStatus() {
-        return null;
+        return instance.getDaemonConnector().fetchInstanceInfoToStatus(this.instanceName);
     }
 
     @Override
     public CrashReportStorage convertCrashReport(String s) {
-        return null;
+        return new CrashReportStorage(name, 0L,List.of());
     }
 
     @Override
     public String getName() {
-        return null;
+        return name;
     }
 
     @Override

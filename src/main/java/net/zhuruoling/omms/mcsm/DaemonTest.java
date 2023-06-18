@@ -10,6 +10,10 @@ public class DaemonTest {
         var daemon1 = new MCSMDaemon(token1,"localhost:24444","testDaemon");
         DaemonConnector connector1 = new DaemonConnector(daemon1);
         connector1.connect();
+        connector1.fetchInstances();
         System.out.println(connector1.fetchInfo());
+        System.out.println(connector1.fetchInstances());
+        System.out.println(connector1.fetchInstanceInfoToStatus("test"));
+        connector1.close();
     }
 }

@@ -4,6 +4,10 @@ package net.zhuruoling.omms.mcsm.daemon
 import io.socket.client.IO
 import io.socket.client.Socket
 import io.socket.emitter.Emitter
+import net.zhuruoling.omms.central.controller.Status
+import net.zhuruoling.omms.mcsm.daemon.data.instance.InstanceListData
+import net.zhuruoling.omms.mcsm.daemon.data.overview.OverviewData
+import net.zhuruoling.omms.mcsm.daemon.exception.InstanceNotFoundException
 import org.json.JSONObject
 import org.slf4j.LoggerFactory
 import java.net.URI
@@ -12,19 +16,20 @@ import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-fun asyncWaitCall() {
 
-}
 
-class DaemonConnector constructor(private val daemon: MCSMDaemon) : AutoCloseable, WebSocket.Listener {
+
+@SuppressWarnings("all")
+class DaemonConnector constructor(private val daemon: MCSMDaemon) : WebSocket.Listener {
     private val logger = LoggerFactory.getLogger("DaemonConnector")
     private lateinit var socket: Socket
     private var connected = false
     private var authPassed = false
-    var overviewData:OverviewData? = null
+    val instances = mutableListOf<MCSMDaemonInstance>()
+    var overviewData: OverviewData? = null
 
     private fun log(message: String) {
-        logger.info("[%s] %s".formatted(daemon.name, message))
+        logger.info("[${daemon.name}] $message")
     }
 
     private fun onConnect() {
@@ -36,12 +41,51 @@ class DaemonConnector constructor(private val daemon: MCSMDaemon) : AutoCloseabl
         log("Disconnected.")
     }
 
+
+    fun fetchInstanceInfoToStatus(instanceName: String): Status {
+        val status = Status()
+        val instance = fetchInstanceFilteredByName(instanceName).data.filter { it.config.nickname == instanceName }.run {
+            ifEmpty {
+                throw InstanceNotFoundException("Instance $instanceName not found.")
+            }
+            get(0)
+        }
+        status.apply {
+            this.isAlive = instance.status != DaemonStatus.STATUS_STOP
+            this.type = "mcsmanager_instance"
+            this.name = instance.config.nickname
+            this.isQueryable = true
+            this.maxPlayerCount = instance.info.maxPlayers
+            this.playerCount = instance.info.currentPlayers
+            this.players = instance.info.playersChart
+        }
+        return status
+    }
+
+
+    fun fetchInstanceFilteredByName(condition: String): InstanceListData {
+        val j = JSONObject()
+            .put("page", 1)
+            .put("pageSize", Int.MAX_VALUE)
+            .put("condition", JSONObject().put("instanceName", condition))
+        var instanceListData: InstanceListData? = null
+        request("instance/select", j) {
+            instanceListData = InstanceListData.fromJson(this!!.getJSONObject("data"))
+        }
+        while (instanceListData == null) Thread.sleep(10)
+        instanceListData!!.data.forEach {
+            val instanceName = it.config.nickname.replace(" ", "_")
+            instances += MCSMDaemonInstance(instanceName, this, it)
+        }
+        return instanceListData!!
+    }
+
     fun connect() {
-        log("Attempt to establish connection with daemon $daemon")
         val addr = "ws://${daemon.address}"
         log(addr)
         socket = IO.socket(URI.create(addr))
         socket.on("connect") {
+            log("Attempt to establish connection with daemon $daemon")
             onConnect()
         }
         socket.on("disconnect") {
@@ -68,15 +112,21 @@ class DaemonConnector constructor(private val daemon: MCSMDaemon) : AutoCloseabl
 
     private fun auth() {
         request("auth", daemon.accessToken) {
-            log(this.toString())
+
             connected = true
             authPassed = this!!.get("data") as Boolean
             if (authPassed) {
                 log("Successfully authenticated with daemon.")
-            }else{
+            } else {
                 log("Cannot auth with daemon")
             }
         }
+    }
+
+    //{ page: 1, pageSize: 20, condition: { instanceName: '' } }
+    //
+    fun fetchInstances(): InstanceListData {
+        return fetchInstanceFilteredByName("")
     }
 
     fun changeLanguage(lang: String) {
@@ -99,13 +149,12 @@ class DaemonConnector constructor(private val daemon: MCSMDaemon) : AutoCloseabl
         latch.await(timeout, TimeUnit.MILLISECONDS)
     }
 
-    fun fetchInfo(): OverviewData{
+    fun fetchInfo(): OverviewData {
         overviewData = null
-        request("info/overview", null){
-            log("OVERVIEW $this")
+        request("info/overview", null) {
             overviewData = OverviewData.fromJson(this!!.getJSONObject("data"))
         }
-        while (overviewData == null)Thread.sleep(10)
+        while (overviewData == null) Thread.sleep(10)
         return overviewData!!
     }
 
@@ -128,7 +177,7 @@ class DaemonConnector constructor(private val daemon: MCSMDaemon) : AutoCloseabl
         socket.emit(event, protocolData)
     }
 
-    override fun close() {
+    fun close() {
         socket.disconnect()
         socket.close()
         connected = false
