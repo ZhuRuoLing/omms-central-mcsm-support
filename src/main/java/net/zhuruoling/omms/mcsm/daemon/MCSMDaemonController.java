@@ -28,7 +28,7 @@ public class MCSMDaemonController extends Controller {
 
     @Override
     public List<String> sendCommand(String s) {
-        return List.of();
+        return instance.getDaemonConnector().executeCommand(this.instanceName, s);
     }
 
     @Override
@@ -54,5 +54,13 @@ public class MCSMDaemonController extends Controller {
     @Override
     public String getType() {
         return "mcsmanager_instance";
+    }
+
+    public DaemonConnector getConnector(){
+        return this.instance.getDaemonConnector();
+    }
+
+    public String getInstanceName() {
+        return instanceName;
     }
 }

@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 
 public class MCSMSupport extends PluginMain {
 
@@ -34,7 +35,7 @@ public class MCSMSupport extends PluginMain {
                 Config.INSTANCE.getMcsmDaemons().forEach(daemon ->
                         Config.INSTANCE.run(m -> {
                             try {
-                                var connector = new DaemonConnector(daemon);
+                                var connector = new DaemonConnector(daemon, null);
                                 connector.connect();
                                 connector.fetchInstances();
                                 connector.getInstances().forEach(mcsmDaemonInstance -> controllerManager.addController(new MCSMDaemonController(mcsmDaemonInstance)));
@@ -50,44 +51,47 @@ public class MCSMSupport extends PluginMain {
             commandManager.getCommandDispatcher().register(LiteralArgumentBuilder.<CommandSourceStack>literal("mcsm")
                     .then(LiteralArgumentBuilder.<CommandSourceStack>literal("refresh")
                             .executes(commandContext -> {
-                                synchronized (Config.INSTANCE.daemonConnectorMap) {
-                                    Config.INSTANCE.daemonConnectorMap.forEach((mcsmDaemon, daemonConnector) -> {
-                                        daemonConnector.getInstances().forEach(mcsmDaemonInstance -> {
-                                            var removed = new ArrayList<Pair<String, MCSMDaemonController>>();
-                                            synchronized (ControllerManager.INSTANCE.getControllers()) {
-                                                ControllerManager.INSTANCE.getControllers().forEach((s, controller1) -> {
-                                                    if (Objects.equals(s, mcsmDaemonInstance.getDisplayName()) && controller1 instanceof MCSMDaemonController) {
-                                                        removed.add(new Pair<>(s, (MCSMDaemonController) controller1));
-                                                    }
-                                                });
-                                                removed.forEach(pair -> ControllerManager.INSTANCE.getControllers().remove(pair.getFirst(), pair.getSecond()));
-                                            }
-                                        });
-                                        daemonConnector.close();
-                                    });
-                                    Config.INSTANCE.daemonConnectorMap.clear();
-                                    Config.INSTANCE.readConfig();
-                                    Config.INSTANCE.getMcsmDaemons().forEach(daemon ->
-                                            Config.INSTANCE.run(m -> {
-                                                try {
-                                                    var connector = new DaemonConnector(daemon);
-                                                    connector.connect();
-                                                    connector.fetchInstances();
-                                                    connector.getInstances().forEach(mcsmDaemonInstance -> {
-                                                        ControllerManager.INSTANCE.addController(new MCSMDaemonController(mcsmDaemonInstance));
-                                                    });
-                                                    m.put(daemon, connector);
-                                                } catch (Exception e) {
-                                                    logger.error("An exception occurred while adding controller.", e);
-                                                }
-                                            })
-                                    );
-                                }
+                                handleRefresh();
                                 return 0;
                             })
                     )
-
             );
         });
+    }
+
+    private void handleRefresh() {
+        synchronized (Config.INSTANCE.daemonConnectorMap) {
+            Config.INSTANCE.daemonConnectorMap.forEach((mcsmDaemon, daemonConnector) -> {
+                daemonConnector.getInstances().forEach(mcsmDaemonInstance -> {
+                    var removed = new ArrayList<Pair<String, MCSMDaemonController>>();
+                    synchronized (ControllerManager.INSTANCE.getControllers()) {
+                        ControllerManager.INSTANCE.getControllers().forEach((s, controller1) -> {
+                            if (Objects.equals(s, mcsmDaemonInstance.getDisplayName()) && controller1 instanceof MCSMDaemonController) {
+                                removed.add(new Pair<>(s, (MCSMDaemonController) controller1));
+                            }
+                        });
+                        removed.forEach(pair -> ControllerManager.INSTANCE.getControllers().remove(pair.getFirst(), pair.getSecond()));
+                    }
+                });
+                daemonConnector.close();
+            });
+            Config.INSTANCE.daemonConnectorMap.clear();
+            Config.INSTANCE.readConfig();
+            Config.INSTANCE.getMcsmDaemons().forEach(daemon ->
+                    Config.INSTANCE.run(m -> {
+                        try {
+                            var connector = new DaemonConnector(daemon, null);
+                            connector.connect();
+                            connector.fetchInstances();
+                            connector.getInstances().forEach(mcsmDaemonInstance -> {
+                                ControllerManager.INSTANCE.addController(new MCSMDaemonController(mcsmDaemonInstance));
+                            });
+                            m.put(daemon, connector);
+                        } catch (Exception e) {
+                            logger.error("An exception occurred while adding controller.", e);
+                        }
+                    })
+            );
+        }
     }
 }
