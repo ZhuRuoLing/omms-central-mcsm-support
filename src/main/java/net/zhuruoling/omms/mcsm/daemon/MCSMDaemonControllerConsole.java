@@ -1,6 +1,7 @@
 package net.zhuruoling.omms.mcsm.daemon;
 
 import kotlin.Unit;
+import java.lang.invoke.*;
 import net.zhuruoling.omms.central.controller.Controller;
 import net.zhuruoling.omms.central.controller.console.ControllerConsole;
 import net.zhuruoling.omms.central.controller.console.input.InputSource;
@@ -37,7 +38,7 @@ public class MCSMDaemonControllerConsole extends Thread implements ControllerCon
     }
 
     @Override
-    public void start() {
+    public void run() {
         printTarget.println("-------- Console Log History -------", this);
         Arrays.stream(controller.getConnector().fetchInstanceLog(instanceName).split("\n")).forEach(s -> printTarget.println(s, this));
         password = controller.getConnector().startStreamRedirect(instanceName, (line, uuid) -> {

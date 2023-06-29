@@ -1,4 +1,4 @@
-package net.zhuruoling.omms.mcsm;
+package net.zhuruoling.omms.mcsm.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -23,7 +23,7 @@ public class Config {
     public final static Path CONFIG_DIR = Path.of(Util.joinFilePaths("config"));
     private final static Gson gson = new GsonBuilder().serializeNulls().create();
 
-    private List<MCSMDaemon> mcsmDaemons = new ArrayList<>();
+    private ConfigStorage configStorage;
 
     public final Map<MCSMDaemon, DaemonConnector> daemonConnectorMap = new HashMap<>();
 
@@ -33,7 +33,6 @@ public class Config {
 
     public boolean readConfig() {
         boolean init = false;
-        mcsmDaemons.clear();
         if (!CONFIG_DIR.toFile().exists()) {
             init = true;
             try {
@@ -48,7 +47,7 @@ public class Config {
                 CONFIG_PATH.toFile().createNewFile();
                 var file = CONFIG_PATH.toFile();
                 var writer = new BufferedWriter(new FileWriter(file));
-                gson.toJson(new ArrayList<MCSMDaemon>(), writer);
+                gson.toJson(new ConfigStorage(), writer);
                 writer.flush();
                 writer.close();
             } catch (IOException e) {
@@ -56,10 +55,7 @@ public class Config {
             }
         }
         try (var reader = new BufferedReader(new FileReader(CONFIG_PATH.toFile()));) {
-            var list = gson.fromJson(reader, MCSMDaemon[].class);
-            for (MCSMDaemon daemon : list) {
-                mcsmDaemons.add(daemon);
-            }
+            configStorage = gson.fromJson(reader, ConfigStorage.class);
         } catch (IOException e) {
             throw new PluginInitializationException("Cannot read plugin config.", e);
         }
@@ -67,7 +63,7 @@ public class Config {
     }
 
     public List<MCSMDaemon> getMcsmDaemons() {
-        return mcsmDaemons;
+        return configStorage.mcsmDaemons;
     }
 
     public Map<MCSMDaemon, DaemonConnector> getDaemonConnectorMap() {
@@ -78,4 +74,17 @@ public class Config {
         func.accept(daemonConnectorMap);
     }
 
+    public String getFrpcDefaultConfigPath() {
+        return configStorage.frpcDefaultConfigPath;
+    }
+
+    public boolean isFrpcAutoConfigureEnabled(){
+        return configStorage.frpcAutoConfigure;
+    }
+
+    private class ConfigStorage {
+        private List<MCSMDaemon> mcsmDaemons = new ArrayList<>();
+        private String frpcDefaultConfigPath = "";
+        private boolean frpcAutoConfigure = false;
+    }
 }

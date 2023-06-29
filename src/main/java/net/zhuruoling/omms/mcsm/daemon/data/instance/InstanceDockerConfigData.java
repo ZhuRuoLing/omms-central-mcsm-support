@@ -7,17 +7,17 @@ import java.util.List;
 public class InstanceDockerConfigData {//IDockerConfig
     String containerName;
     String image;
-    String memory;
+    double memory;
     List<String> ports;
     List<String> extraVolumes;
-    long maxSpace;
+    double maxSpace;
     @Nullable
     Long network;
-    long io;
+    double io;
     String networkMode;
     List<String> networkAliases;
     String cpusetCpus;
-    long cpuUsage;
+    double cpuUsage;
 
     public String getContainerName() {
         return containerName;
@@ -27,7 +27,7 @@ public class InstanceDockerConfigData {//IDockerConfig
         return image;
     }
 
-    public String getMemory() {
+    public double getMemory() {
         return memory;
     }
 
@@ -39,7 +39,7 @@ public class InstanceDockerConfigData {//IDockerConfig
         return extraVolumes;
     }
 
-    public long getMaxSpace() {
+    public double getMaxSpace() {
         return maxSpace;
     }
 
@@ -47,7 +47,7 @@ public class InstanceDockerConfigData {//IDockerConfig
         return network;
     }
 
-    public long getIo() {
+    public double getIo() {
         return io;
     }
 
@@ -63,7 +63,7 @@ public class InstanceDockerConfigData {//IDockerConfig
         return cpusetCpus;
     }
 
-    public long getCpuUsage() {
+    public double getCpuUsage() {
         return cpuUsage;
     }
 }

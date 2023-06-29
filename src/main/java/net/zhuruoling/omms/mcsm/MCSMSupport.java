@@ -7,6 +7,7 @@ import net.zhuruoling.omms.central.controller.ControllerManager;
 import net.zhuruoling.omms.central.plugin.PluginMain;
 import net.zhuruoling.omms.central.plugin.callback.CommandRegistrationCallback;
 import net.zhuruoling.omms.central.plugin.callback.ControllerLoadCallback;
+import net.zhuruoling.omms.mcsm.config.Config;
 import net.zhuruoling.omms.mcsm.daemon.DaemonConnector;
 import net.zhuruoling.omms.mcsm.daemon.MCSMDaemon;
 import net.zhuruoling.omms.mcsm.daemon.MCSMDaemonController;
@@ -17,10 +18,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 
 public class MCSMSupport extends PluginMain {
-
     private final Logger logger = LoggerFactory.getLogger("MCSMSupport");
 
     @Override
@@ -55,9 +54,31 @@ public class MCSMSupport extends PluginMain {
                                 return 0;
                             })
                     )
+                    .then(LiteralArgumentBuilder.<CommandSourceStack>literal("frpc")
+                            .then(LiteralArgumentBuilder.<CommandSourceStack>literal("start").executes(commandContext -> {
+                                        startFrpcServices();
+                                        return 0;
+                                    })
+                            )
+                            .then(LiteralArgumentBuilder.<CommandSourceStack>literal("stop").executes(commandContext -> {
+                                        stopFrpcServices();
+                                        return 0;
+                                    })
+                            )
+                    )
             );
         });
     }
+
+    private void startFrpcServices() {
+        if (!Config.INSTANCE.isFrpcAutoConfigureEnabled())return;
+
+    }
+
+    private void stopFrpcServices() {
+        if (!Config.INSTANCE.isFrpcAutoConfigureEnabled())return;
+    }
+
 
     private void handleRefresh() {
         synchronized (Config.INSTANCE.daemonConnectorMap) {

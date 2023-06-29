@@ -13,7 +13,7 @@ repositories {
     maven {
         url = uri("https://libraries.minecraft.net")
     }
-
+    maven { url = uri("https://jitpack.io") }
     maven {
         url = uri("https://repo.opencollab.dev/maven-releases/")
     }
@@ -27,7 +27,7 @@ repositories {
 }
 
 dependencies {
-    implementation(fileTree("./libs"))
+    implementation("com.github.OhMyMinecraftServer:omms-central:master-SNAPSHOT")
     implementation("io.ktor:ktor-server-auth:2.0.2")
     implementation("io.ktor:ktor-server-auth-jvm:2.0.2")
     implementation("uk.org.lidalia:sysout-over-slf4j:1.0.2")
@@ -70,7 +70,7 @@ dependencies {
 tasks{
     shadowJar{
         dependencies{
-            exclude(dependency(fileTree("./libs")))
+            exclude(dependency("com.github.OhMyMinecraftServer:omms-central:master-SNAPSHOT"))
             exclude(dependency("io.ktor:ktor-server-auth:2.0.2"))
             exclude(dependency("io.ktor:ktor-server-auth-jvm:2.0.2"))
             exclude(dependency("uk.org.lidalia:sysout-over-slf4j:1.0.2"))

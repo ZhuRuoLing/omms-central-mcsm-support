@@ -86,10 +86,20 @@ class DaemonConnector constructor(
         }
     }
 
+    private fun removeSubConnector(instanceName: String, password: String){
+        if (parentConnector != null){
+            val pair = instanceName to password
+            subConnectors.remove(pair)
+        }else{
+            throw IllegalStateException("")
+        }
+    }
+
     fun abortStreamRedirect(instanceName: String, password: String) {
         if (parentConnector != null) {
             this.socket.off("instance/stdout")
             this.close()
+            removeSubConnector(instanceName, password)
         } else {
             val p = Pair(instanceName, password)
             val connector = subConnectors[p]!!
@@ -329,4 +339,8 @@ class DaemonConnector constructor(
 
 operator fun JSONObject.contains(key: String): Boolean {
     return this.has(key)
+}
+
+fun main() {
+
 }
