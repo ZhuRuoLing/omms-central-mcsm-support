@@ -74,8 +74,16 @@ public class Config {
         func.accept(daemonConnectorMap);
     }
 
-    public String getFrpcDefaultConfigPath() {
-        return configStorage.frpcDefaultConfigPath;
+    public String getFrpcClientCommonConfig() {
+        return configStorage.frpcClientCommonConfig;
+    }
+
+    public String getFrpcClientPortConfig() {
+        return configStorage.frpcClientPortConfig;
+    }
+
+    public String getFrpcClientExecutablePath(){
+        return configStorage.frpcClientExectuablePath;
     }
 
     public boolean isFrpcAutoConfigureEnabled(){
@@ -84,7 +92,10 @@ public class Config {
 
     private class ConfigStorage {
         private List<MCSMDaemon> mcsmDaemons = new ArrayList<>();
-        private String frpcDefaultConfigPath = "";
+        private String frpcClientCommonConfig = "[common]\nserver_addr=127.0.0.1\nserver_port=1145\ntcp_mux=true\nprotocol=tcp\nuser=user_name\ntoken=user_token";
+        private String frpcClientPortConfig = "[{0}]\nprivilege_mode=true\ntype={1}\nlocal_ip=127.0.0.1\nlocal_port={2}\nremote_port={3}\nuse_encryption=true\nuse_compression=false";
+
+        private String frpcClientExectuablePath = "./frpc";
         private boolean frpcAutoConfigure = false;
     }
 }

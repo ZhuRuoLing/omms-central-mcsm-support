@@ -214,7 +214,7 @@ class DaemonConnector constructor(
     }
 
 
-    fun fetchInstanceFilteredByName(condition: String): InstanceListData {
+    private fun fetchInstanceFilteredByName(condition: String): InstanceListData {
         val j = JSONObject()
             .put("page", 1)
             .put("pageSize", Int.MAX_VALUE)
