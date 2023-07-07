@@ -35,17 +35,24 @@ public class MCSMSupport extends PluginMain {
             throw new PluginInitializationException("Config file not exist, default empty config created, this plugin will not load.");
         }
 
-        ControllerLoadCallback.INSTANCE.register(controllerManager -> Config.INSTANCE.getMcsmDaemons().forEach(daemon -> Config.INSTANCE.run(m -> {
-            try {
-                var connector = new DaemonConnector(daemon, null);
-                connector.connect();
-                connector.fetchInstances();
-                connector.getInstances().forEach(mcsmDaemonInstance -> controllerManager.addController(new MCSMDaemonController(mcsmDaemonInstance)));
-                m.put(daemon, connector);
-            } catch (Exception e) {
-                logger.error("An exception occurred while adding controller.", e);
-            }
-        })));
+        ControllerLoadCallback.INSTANCE.register(controllerManager ->
+                Config.INSTANCE.getMcsmDaemons().forEach(daemon ->
+                        Config.INSTANCE.run(m -> {
+                            try {
+                                var connector = new DaemonConnector(daemon, null);
+                                if (connector.connect()) {
+                                    connector.fetchInstances();
+                                    connector.getInstances().forEach(mcsmDaemonInstance ->
+                                            controllerManager.addController(new MCSMDaemonController(mcsmDaemonInstance))
+                                    );
+                                    m.put(daemon, connector);
+                                }
+                            } catch (Exception e) {
+                                logger.error("An exception occurred while adding controller.", e);
+                            }
+                        })
+                )
+        );
 
         CommandRegistrationCallback.INSTANCE.register(commandManager -> {
             commandManager.getCommandDispatcher().register(LiteralArgumentBuilder.<CommandSourceStack>literal("mcsm").then(LiteralArgumentBuilder.<CommandSourceStack>literal("refresh").executes(commandContext -> {
@@ -128,12 +135,13 @@ public class MCSMSupport extends PluginMain {
             Config.INSTANCE.getMcsmDaemons().forEach(daemon -> Config.INSTANCE.run(m -> {
                 try {
                     var connector = new DaemonConnector(daemon, null);
-                    connector.connect();
-                    connector.fetchInstances();
-                    connector.getInstances().forEach(mcsmDaemonInstance -> {
-                        ControllerManager.INSTANCE.addController(new MCSMDaemonController(mcsmDaemonInstance));
-                    });
-                    m.put(daemon, connector);
+                    if(connector.connect()) {
+                        connector.fetchInstances();
+                        connector.getInstances().forEach(mcsmDaemonInstance -> {
+                            ControllerManager.INSTANCE.addController(new MCSMDaemonController(mcsmDaemonInstance));
+                        });
+                        m.put(daemon, connector);
+                    }
                 } catch (Exception e) {
                     logger.error("An exception occurred while adding controller.", e);
                 }

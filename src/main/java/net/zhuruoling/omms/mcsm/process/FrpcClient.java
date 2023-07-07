@@ -1,16 +1,17 @@
 package net.zhuruoling.omms.mcsm.process;
 
 import kotlin.Unit;
-import kotlin.jvm.functions.Function1;
 import net.zhuruoling.omms.central.system.runner.RunnerDaemon;
 import net.zhuruoling.omms.central.util.Util;
 import net.zhuruoling.omms.mcsm.config.Config;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import oshi.util.FileUtil;
 
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
