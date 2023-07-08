@@ -1,5 +1,6 @@
 {
   "id": "omms_mcsm_support",
   "version": "0.3",
-  "main": "net.zhuruoling.omms.mcsm.MCSMSupport"
+  "main": "net.zhuruoling.omms.mcsm.MCSMSupport",
+  "author": "ZhuRuoLing"
 }

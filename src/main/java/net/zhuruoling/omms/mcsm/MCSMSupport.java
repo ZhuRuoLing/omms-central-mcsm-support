@@ -41,11 +41,15 @@ public class MCSMSupport extends PluginMain {
                             try {
                                 var connector = new DaemonConnector(daemon, null);
                                 if (connector.connect()) {
-                                    connector.fetchInstances();
-                                    connector.getInstances().forEach(mcsmDaemonInstance ->
-                                            controllerManager.addController(new MCSMDaemonController(mcsmDaemonInstance))
-                                    );
-                                    m.put(daemon, connector);
+                                    if (connector.auth()) {
+                                        connector.fetchInstances();
+                                        connector.getInstances().forEach(mcsmDaemonInstance ->
+                                                controllerManager.addController(new MCSMDaemonController(mcsmDaemonInstance))
+                                        );
+                                        m.put(daemon, connector);
+                                    } else {
+                                        logger.error("Cannot auth with daemon.");
+                                    }
                                 }
                             } catch (Exception e) {
                                 logger.error("An exception occurred while adding controller.", e);
@@ -135,12 +139,16 @@ public class MCSMSupport extends PluginMain {
             Config.INSTANCE.getMcsmDaemons().forEach(daemon -> Config.INSTANCE.run(m -> {
                 try {
                     var connector = new DaemonConnector(daemon, null);
-                    if(connector.connect()) {
-                        connector.fetchInstances();
-                        connector.getInstances().forEach(mcsmDaemonInstance -> {
-                            ControllerManager.INSTANCE.addController(new MCSMDaemonController(mcsmDaemonInstance));
-                        });
-                        m.put(daemon, connector);
+                    if (connector.connect()) {
+                        if (connector.auth()) {
+                            connector.fetchInstances();
+                            connector.getInstances().forEach(mcsmDaemonInstance -> {
+                                ControllerManager.INSTANCE.addController(new MCSMDaemonController(mcsmDaemonInstance));
+                            });
+                            m.put(daemon, connector);
+                        } else {
+                            logger.error("Cannot auth with daemon.");
+                        }
                     }
                 } catch (Exception e) {
                     logger.error("An exception occurred while adding controller.", e);

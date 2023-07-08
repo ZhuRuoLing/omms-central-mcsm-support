@@ -4,6 +4,8 @@ package net.zhuruoling.omms.mcsm.daemon
 import io.socket.client.IO
 import io.socket.client.Socket
 import io.socket.emitter.Emitter
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import net.zhuruoling.omms.central.controller.Status
 import net.zhuruoling.omms.central.util.Util.fromJson
 import net.zhuruoling.omms.central.util.Util.randomStringGen
@@ -16,7 +18,9 @@ import org.slf4j.LoggerFactory
 import java.net.URI
 import java.net.http.WebSocket
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
 
@@ -40,8 +44,7 @@ class DaemonConnector constructor(
     }
 
     private fun onConnect() {
-        debugLog("Attempt to auth with daemon.")
-        auth()
+        debugLog("Connected with ${daemon.address}.")
     }
 
     private fun onDisconnect() {
@@ -50,7 +53,7 @@ class DaemonConnector constructor(
 
 
     fun fetchInstanceInfoToStatus(instanceName: String): Status {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         val status = Status()
         val instance =
             fetchInstanceFilteredByName(instanceName).data.filter { it.config.nickname == instanceName }.run {
@@ -72,7 +75,7 @@ class DaemonConnector constructor(
     }
 
     fun streamInput(instanceName: String, password: String, s: String) {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         if (parentConnector != null) {
             val instanceUuid = instances.filter { it.instanceData.config.nickname == instanceName }
                 .ifEmpty { throw InstanceNotFoundException(instanceName) }
@@ -99,7 +102,7 @@ class DaemonConnector constructor(
     }
 
     fun abortStreamRedirect(instanceName: String, password: String) {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         if (parentConnector != null) {
             this.socket.off("instance/stdout")
             this.close()
@@ -113,7 +116,7 @@ class DaemonConnector constructor(
     }
 
     fun fetchInstanceLog(instanceName: String): String {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         val instanceUuid = instances.filter { it.instanceData.config.nickname == instanceName }
             .ifEmpty { throw InstanceNotFoundException(instanceName) }
             .map { it.instanceData.instanceUuid }[0]
@@ -131,7 +134,7 @@ class DaemonConnector constructor(
     }
 
     private fun registerMissionPassport(instanceName: String, password: String, mission: String): String {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         val instanceUuid = instances.filter { it.instanceData.config.nickname == instanceName }
             .ifEmpty { throw InstanceNotFoundException(instanceName) }
             .map { it.instanceData.instanceUuid }[0]
@@ -160,26 +163,25 @@ class DaemonConnector constructor(
     }
 
     fun startStreamRedirect(instanceName: String, func: String.(String) -> Unit): String {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         return if (this.parentConnector != null) {
             val password = randomStringGen(32)
             registerMissionPassport(instanceName, password, "stream_channel")
-            var result: Boolean? = null
-            request("stream/auth", JSONObject().put("password", password)) {
+            val result = requestForResult("stream/auth", JSONObject().put("password", password)) {
                 val status = this!!.getInt("status")
-                if (status == 200) {
-                    result = true
+                return@requestForResult if (status == 200) {
+                    Result.success(true)
                 } else {
-                    result = false
-                    throw RemoteException(this.getString("data"))
+                    Result.failure(RemoteException(this.getString("data")))
                 }
             }
-            while (result == null) Thread.sleep(50)
-            onEvent("instance/stdout") { i, e ->
-                val data = this!!.getJSONObject("data")
-                val text = data.getString("text")
-                val instanceUuid = data.getString("instanceUuid")
-                func(text, instanceUuid)
+            if(result.getOrThrow()) {
+                onEvent("instance/stdout") { _, _ ->
+                    val data = this!!.getJSONObject("data")
+                    val text = data.getString("text")
+                    val instanceUuid = data.getString("instanceUuid")
+                    func(text, instanceUuid)
+                }
             }
             password
         } else {
@@ -194,50 +196,48 @@ class DaemonConnector constructor(
 
 
     fun executeCommand(instanceName: String, command: String): MutableList<String> {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         val data = JSONObject()
         val instanceUuid = instances.filter { it.instanceData.config.nickname == instanceName }
             .ifEmpty { throw InstanceNotFoundException(instanceName) }
             .map { it.instanceData.instanceUuid }[0]
-        var resultUuid: String? = null
-        var error: String? = null
+
         data.put("instanceUuid", instanceUuid)
         data.put("command", command)
-        request("instance/command", data) {
+        val result = requestForResult("instance/command", data) {
             val obj = this!!.getJSONObject("data")
-            if ("err" in obj) {
-                error = obj.getString("err")
-            }
-            resultUuid = obj.getString("instanceUuid")
+            Pair(
+                if ("err" in obj) obj.getString("err") else null,
+                if ("instanceUuid" in obj) obj.getString("instanceUuid") else null
+            )
         }
-        while (resultUuid == null) Thread.sleep(50)
+        val resultUuid: String? = result.second
+        val error: String? = result.first
         return mutableListOf(
             "Target instance uuid: $resultUuid",
             "Command response can`t be shown because mcsmanager daemon have no such functionality."
         ).run {
             if (error != null)
-                add("Error: ${error!!}")
+                add("Error: $error")
             this
         }
     }
 
 
     private fun fetchInstanceFilteredByName(condition: String): InstanceListData {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         val j = JSONObject()
             .put("page", 1)
             .put("pageSize", Int.MAX_VALUE)
             .put("condition", JSONObject().put("instanceName", condition))
-        var instanceListData: InstanceListData? = null
-        request("instance/select", j) {
-            instanceListData = InstanceListData.fromJson(this!!.getJSONObject("data"))
+        val instanceListData = requestForResult("instance/select", j) {
+            InstanceListData.fromJson(this!!.getJSONObject("data"))
         }
-        while (instanceListData == null) Thread.sleep(10)
         instanceListData!!.data.forEach {
             val instanceName = it.config.nickname.replace(" ", "_")
             instances += MCSMDaemonInstance(instanceName, this, it)
         }
-        return instanceListData!!
+        return instanceListData
     }
 
     fun connect(): Boolean {
@@ -247,7 +247,6 @@ class DaemonConnector constructor(
         var anyError = false
         socket.on("connect") {
             debugLog("Attempt to establish connection with daemon $daemon")
-            onConnect()
         }
         socket.on("disconnect") {
             onDisconnect()
@@ -260,6 +259,7 @@ class DaemonConnector constructor(
         var timeout = 100
         while (!socket.connected()) {
             if (timeout <= 0 || anyError) {
+                debugLog("timeout = $timeout, anyError = $anyError")
                 socket.close()
                 connected = false
                 return false
@@ -282,16 +282,11 @@ class DaemonConnector constructor(
         socket.on(event, fn)
     }
 
-    private fun auth() {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
-        request("auth", daemon.accessToken) {
+    fun auth(): Boolean {
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
+        return requestForResult("auth", daemon.accessToken) {
             connected = true
-            authPassed = this!!.get("data") as Boolean
-            if (authPassed) {
-                debugLog("Successfully authenticated with daemon.")
-            } else {
-                debugLog("Cannot auth with daemon")
-            }
+            this!!.get("data") as Boolean
         }
     }
 
@@ -311,24 +306,25 @@ class DaemonConnector constructor(
         }
     }
 
-    @Deprecated("wdnmd CountDownLatch")
-    private fun requestAsync(event: String, data: Any, timeout: Long = 2000, func: JSONObject?.(Int) -> Unit) {
-        val latch = CountDownLatch(1)
-        request(event, data) {
-            func(this, it)
-            latch.countDown()
+    fun fetchInfo(): OverviewData {
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
+        return requestForResult("info/overview", null) {
+            OverviewData.fromJson(this!!.getJSONObject("data"))
         }
-        latch.await(timeout, TimeUnit.MILLISECONDS)
     }
 
-    fun fetchInfo(): OverviewData {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
-        overviewData = null
-        request("info/overview", null) {
-            overviewData = OverviewData.fromJson(this!!.getJSONObject("data"))
+    private fun <T> requestForResult(
+        event: String,
+        data: Any?,
+        timeout: Long = 5000,
+        timeUnit: TimeUnit = TimeUnit.MILLISECONDS,
+        fn: JSONObject?.(Int) -> T
+    ): T {
+        val completableFuture = CompletableFuture<T>()
+        request(event, data, true) {
+            completableFuture.complete(fn(this, it))
         }
-        while (overviewData == null) Thread.sleep(10)
-        return overviewData!!
+        return completableFuture[timeout, timeUnit]
     }
 
     private fun request(event: String, data: Any?, hasResponse: Boolean = true, func: JSONObject?.(Int) -> Unit) {
@@ -353,7 +349,7 @@ class DaemonConnector constructor(
     }
 
     fun close() {
-        if (!connected)throw IllegalStateException("Require available daemon connection(connected = false).")
+        if (!connected) throw IllegalStateException("Require available daemon connection(connected = false).")
         socket.off()
         socket.close()
         connected = false
